@@ -20,7 +20,7 @@ type Type byte
 
 // Value struct stores all info of resp parsed
 type Value struct {
-	Typ     Type
+	typ     Type
 	Integer int
 	Str     []byte
 	Array   []Value
@@ -51,10 +51,13 @@ func (resp *RespReader) ReadValue() (Value, error) {
 		switch char {
 		case ':':
 			return resp.readInteger()
+		case '+':
+			return resp.readString()
 		case '$':
 			return resp.readBulkString()
+		case '-':
+			return resp.readErrorMessage()
 		}
-
 	}
 	return Value{IsNull: true}, fmt.Errorf("parsing error: beginning doesn't follow resp convensions")
 }
@@ -69,7 +72,7 @@ func (resp *RespReader) readInteger() (Value, error) {
 	if err != nil {
 		return Value{IsNull: true}, err
 	}
-	return Value{Typ: ':', Integer: num}, err
+	return Value{typ: ':', Integer: num}, err
 }
 
 func (resp *RespReader) readInt() (int, error) {
@@ -99,13 +102,14 @@ func (resp *RespReader) readLine() (line []byte, err error) {
 	return line[:len(line)-2], err
 }
 
+// readBulkString parses bulk string specified with length
 func (resp *RespReader) readBulkString() (Value, error) {
 	l, err := resp.readInt()
 	if err != nil {
 		return Value{IsNull: true}, err
 	}
 	if l < 0 {
-		return Value{Typ: '$', IsNull: true}, fmt.Errorf("parsing error: string cannot have negative length")
+		return Value{typ: '$', IsNull: true}, fmt.Errorf("parsing error: string cannot have negative length")
 	}
 	// actual string length (added 2 bytes to read \r\n)
 	strBytes := make([]byte, l+2)
@@ -114,7 +118,19 @@ func (resp *RespReader) readBulkString() (Value, error) {
 		return Value{IsNull: true}, err
 	}
 	if strBytes[l] != '\r' && strBytes[l+1] != '\n' {
-		return Value{Typ: '$', IsNull: true}, fmt.Errorf("parsing error: string doesn't end with the CRLF terminator")
+		return Value{typ: '$', IsNull: true}, fmt.Errorf("parsing error: string doesn't end with the CRLF terminator")
 	}
-	return Value{Typ: '$', Str: strBytes[:l]}, err
+	return Value{typ: '$', Str: strBytes[:l]}, err
+}
+
+// readString parses simple string
+func (resp *RespReader) readString() (Value, error) {
+	line, err := resp.readLine()
+	return Value{typ: '+', Str: line}, err
+}
+
+// readString parses error messages
+func (resp *RespReader) readErrorMessage() (Value, error) {
+	line, err := resp.readLine()
+	return Value{typ: '-', Err: fmt.Errorf(string(line))}, err
 }
