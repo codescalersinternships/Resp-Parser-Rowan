@@ -20,12 +20,12 @@ type Type byte
 
 // Value struct stores all info of resp parsed
 type Value struct {
-	typ     Type
-	integer int
-	str     []byte
-	array   []Value
-	err     error
-	isNull  bool
+	Typ     Type
+	Integer int
+	Str     []byte
+	Array   []Value
+	Err     error
+	IsNull  bool
 }
 
 // RespReader struct is the buffer which is used to parse
@@ -42,8 +42,9 @@ func NewReader(reader io.Reader) RespReader {
 func (resp *RespReader) ReadValue() (Value, error) {
 	char, err := resp.reader.ReadByte()
 	if err != nil {
-		return Value{isNull: true}, err
+		return Value{IsNull: true}, err
 	}
+	fmt.Println(char == ':')
 	if char == '*' {
 		return resp.ReadValue()
 	} else {
@@ -51,11 +52,11 @@ func (resp *RespReader) ReadValue() (Value, error) {
 		case ':':
 			return resp.readInteger()
 		case '$':
-			return resp.readString()
+			return resp.readBulkString()
 		}
 
 	}
-	return Value{isNull: true}, fmt.Errorf("parsing error: beginning doesn't follow resp convensions")
+	return Value{IsNull: true}, fmt.Errorf("parsing error: beginning doesn't follow resp convensions")
 }
 
 // func (resp *RespReader) readArray() (Value, error) {
@@ -63,11 +64,12 @@ func (resp *RespReader) ReadValue() (Value, error) {
 // }
 
 func (resp *RespReader) readInteger() (Value, error) {
+	fmt.Println("hello")
 	num, err := resp.readInt()
 	if err != nil {
-		return Value{isNull: true}, err
+		return Value{IsNull: true}, err
 	}
-	return Value{typ: ':', integer: num}, err
+	return Value{Typ: ':', Integer: num}, err
 }
 
 func (resp *RespReader) readInt() (int, error) {
@@ -94,25 +96,25 @@ func (resp *RespReader) readLine() (line []byte, err error) {
 			break
 		}
 	}
-	return
+	return line[:len(line)-2], err
 }
 
-func (resp *RespReader) readString() (Value, error) {
+func (resp *RespReader) readBulkString() (Value, error) {
 	l, err := resp.readInt()
 	if err != nil {
-		return Value{isNull: true}, err
+		return Value{IsNull: true}, err
 	}
 	if l < 0 {
-		return Value{typ: '$', isNull: true}, fmt.Errorf("parsing error: string cannot have negative length")
+		return Value{Typ: '$', IsNull: true}, fmt.Errorf("parsing error: string cannot have negative length")
 	}
 	// actual string length (added 2 bytes to read \r\n)
 	strBytes := make([]byte, l+2)
 	_, err = io.ReadFull(resp.reader, strBytes)
 	if err != nil {
-		return Value{isNull: true}, err
+		return Value{IsNull: true}, err
 	}
 	if strBytes[l] != '\r' && strBytes[l+1] != '\n' {
-		return Value{typ: '$', isNull: true}, fmt.Errorf("parsing error: string doesn't end with the CRLF terminator")
+		return Value{Typ: '$', IsNull: true}, fmt.Errorf("parsing error: string doesn't end with the CRLF terminator")
 	}
-	return Value{typ: '$', str: strBytes[:l]}, err
+	return Value{Typ: '$', Str: strBytes[:l]}, err
 }
