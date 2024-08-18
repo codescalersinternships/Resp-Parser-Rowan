@@ -143,11 +143,17 @@ func (resp *RespReader) readBulkString() (Value, error) {
 // readString parses simple string
 func (resp *RespReader) readString() (Value, error) {
 	line, err := resp.readLine()
+	if err != nil {
+		return Value{IsNull: true}, err
+	}
 	return Value{typ: '+', Str: line}, err
 }
 
 // readString parses error messages
 func (resp *RespReader) readErrorMessage() (Value, error) {
 	line, err := resp.readLine()
+	if err != nil {
+		return Value{IsNull: true}, err
+	}
 	return Value{typ: '-', Err: errors.New(string(line))}, err
 }
